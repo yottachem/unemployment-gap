@@ -1,0 +1,20 @@
+[project]
+name = "unemployment-gap"
+version = "0.1.0"
+description = "Why unemployment can be low while job seekers struggle: duration, hiring, benefit exhaustion, and what happens after"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pandas>=3.1.0",
+    "pyarrow>=26.0.0",
+    "pyyaml>=6.0.3",
+    "requests>=2.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

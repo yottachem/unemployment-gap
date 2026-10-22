@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Unemployment Gap</title>
+<meta name="description" content="Why the unemployment rate can be low while people looking for work struggle: how long people stay unemployed, hiring vs. layoffs, unemployment benefits running out, and what happens after.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M7 22 L13 15 L18 19 L25 9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+</head>
+<body>
+
+<header class="masthead wrap">
+  <p class="kicker">U.S. labor market &middot; updated automatically from BLS, DOL, and Census data</p>
+  <h1>The Unemployment Gap</h1>
+  <p class="dek">The unemployment rate counts people without a job who looked for one in the past four weeks. It does not show how long they have been looking, how slowly employers are hiring, or what happens when unemployment benefits run out. This page tracks those numbers.</p>
+</header>
+
+<div class="controls" role="region" aria-label="Chart time range">
+  <div class="wrap">
+    <span class="ctl-label" id="range-label">Time range</span>
+    <div class="seg" role="group" aria-labelledby="range-label" id="range">
+      <button type="button" data-range="2000">Since 2000</button>
+      <button type="button" data-range="2015">Since 2015</button>
+      <button type="button" data-range="3y">Last 3 years</button>
+      <button type="button" data-range="all">All data</button>
+    </div>
+    <span class="ctl-label" id="range-note"></span>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="tiles" id="tiles" aria-live="polite"></div>
+
+  <section class="block" id="s1">
+    <h2>1. The headline rate vs. time spent unemployed</h2>
+    <p class="lede" id="lede1"></p>
+    <div class="grid2" id="s1-charts"></div>
+    <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="s1-table"></div></details>
+  </section>
+
+  <section class="block" id="s2">
+    <h2>2. Hiring and layoffs</h2>
+    <p class="lede" id="lede2"></p>
+    <div class="card"><div id="s2-chart"></div></div>
+    <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="s2-table"></div></details>
+  </section>
+
+  <section class="block" id="s3">
+    <h2>3. When state unemployment benefits run out</h2>
+    <p class="lede" id="lede3"></p>
+    <div class="state-pick">
+      <label for="state" class="ctl-label">State</label>
+      <select id="state"></select>
+      <button type="button" class="chip" data-st="US">United States</button>
+      <button type="button" class="chip" data-st="MA">Massachusetts</button>
+    </div>
+    <div class="grid2" id="s3-charts"></div>
+    <p class="note">Shaded blue: federal programs paid extra weeks after state benefits ended (2008-2013 and 2020-2021), so in those windows people using up state benefits did not necessarily lose all benefits. Each state sets its own maximum duration, from 12 to 26 weeks in most states, so exhaustion rates are not directly comparable across states.</p>
+    <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="s3-table"></div></details>
+  </section>
+
+  <section class="block" id="s4">
+    <h2>4. What happens after benefits end</h2>
+    <p class="lede" id="lede4"></p>
+    <div class="card" id="s4-chart"></div>
+    <p class="note" id="s4-note"></p>
+    <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="s4-table"></div></details>
+  </section>
+
+  <section class="block methods" id="methods">
+    <h2>Sources and methods</h2>
+    <h3>Why the headline rate can stay low</h3>
+    <ul>
+      <li><b>Narrow definition.</b> You count as unemployed (U-3) only if you had no work at all and searched in the past four weeks. Someone who stopped searching is "not in the labor force." Someone who did a few hours of paid work, including consulting or gig work, counts as employed.</li>
+      <li><b>Low hiring, low layoffs.</b> When few people are laid off, few enter unemployment, so the rate stays flat. When employers also hire slowly, the people who are unemployed stay unemployed longer. The rate measures how many people are unemployed, not how long they stay unemployed.</li>
+      <li><b>Averages across very different job markets.</b> The national rate combines every sector and occupation, so a downturn in a few fields barely moves it.</li>
+      <li><b>Benefit records stop when benefits end.</b> Unemployment benefit (claims) data covers only people currently receiving benefits. When benefits end, people drop out of those numbers whether or not they found work.</li>
+    </ul>
+    <h3>Data sources and latest month available</h3>
+    <div class="tbl-wrap" id="freshness"></div>
+    <h3>Definitions</h3>
+    <ul>
+      <li><b>Exhaustion rate</b> (DOL formula): people receiving their final state benefit payment over the last 12 months, divided by people receiving a first payment over the 12 months ending six months earlier. Computed here from the DOL ETA 5159 report. Computed values match DOL's published quarterly rates.</li>
+      <li><b>People starting or using up benefits</b>: monthly first payments and final payments under regular state UI, shown as a 12-month moving average to remove seasonal swings. The table shows raw monthly counts.</li>
+      <li><b>U-6</b>: U-3 plus people who want work but stopped looking ("marginally attached," including "discouraged workers") and people working part-time because they could not find full-time work, as a share of the labor force plus the marginally attached.</li>
+      <li><b>Recessions</b> (gray shading): NBER business-cycle dates.</li>
+    </ul>
+    <h3>Section 4 method</h3>
+    <p id="sipp-method"></p>
+    <p>The Census Survey of Income and Program Participation (SIPP) re-interviews the same people every year, asking about each month of the prior year. That lets us follow someone from the month their benefits stopped to what they were doing afterward. SIPP does not record why benefits stopped. "5 or more months of benefits" is used as a stand-in for running out, since most states pay at most 26 weeks. Results are recomputed when Census releases a new year of SIPP data (usually in summer, covering the year before last).</p>
+    <h3>Downloads</h3>
+    <ul>
+      <li><a href="data/labor.csv">labor.csv</a>: national monthly series (wide format)</li>
+      <li><a href="data/benefits.csv">benefits.csv</a>: first payments, final payments, and exhaustion rate by state and month, 1971 to present</li>
+      <li><a href="data/sipp.json">sipp.json</a>: Section 4 estimates with sample sizes</li>
+    </ul>
+    <p>Code and pipeline: <a href="https://github.com/yottachem/unemployment-gap">github.com/yottachem/unemployment-gap</a>. Data refreshes automatically each weekday.</p>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p id="built"></p>
+  <p>Sources: U.S. Bureau of Labor Statistics (CPS, JOLTS) via FRED; U.S. Department of Labor ETA 5159; U.S. Census Bureau SIPP; NBER recession dates. Code MIT; derived data CC-BY-4.0.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

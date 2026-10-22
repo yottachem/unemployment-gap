@@ -1,0 +1,51 @@
+name: update
+on:
+  schedule:
+    - cron: "30 14 * * 1-5"   # weekdays 10:30 ET (EDT): after 8:30 BLS/DOL releases reach FRED
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Fetch sources
+        run: uv run python -m ingest.fetch
+      - name: Build site data
+        run: uv run python -m transform.build_data
+      - name: Test
+        run: uv run pytest -q
+      - name: Build site
+        run: uv run python site/build.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+      - name: Open an issue if a scheduled run fails
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create -R "$GITHUB_REPOSITORY" --title "Update failed $(date -u +%F)" --body "See ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,102 @@
+{
+ "reference_years": "2022-2024",
+ "interview_years": [
+  2023,
+  2024,
+  2025
+ ],
+ "definition": "Adults 18-64 who received regular state unemployment benefits in a month, had no job that month, and did not receive benefits the next month. Status is measured 1, 3 and 6 months after the last month of benefits. Weighted with SIPP monthly person weights.",
+ "min_n": 30,
+ "groups": {
+  "long": {
+   "label": "Received benefits 5+ months (consistent with running out)",
+   "spells": 101,
+   "rows": [
+    {
+     "months_after": 1,
+     "n": 101,
+     "employed": 32.9,
+     "looking": 42.6,
+     "not_looking": 24.5,
+     "employed_moe90": 9.6
+    },
+    {
+     "months_after": 3,
+     "n": 78,
+     "employed": 32.2,
+     "looking": 38.2,
+     "not_looking": 29.6,
+     "employed_moe90": 10.8
+    },
+    {
+     "months_after": 6,
+     "n": 59,
+     "employed": 56.0,
+     "looking": 25.6,
+     "not_looking": 18.3,
+     "employed_moe90": 12.2
+    }
+   ]
+  },
+  "short": {
+   "label": "Received benefits under 5 months",
+   "spells": 88,
+   "rows": [
+    {
+     "months_after": 1,
+     "n": 88,
+     "employed": 42.1,
+     "looking": 30.4,
+     "not_looking": 27.6,
+     "employed_moe90": 10.5
+    },
+    {
+     "months_after": 3,
+     "n": 80,
+     "employed": 63.1,
+     "looking": 14.8,
+     "not_looking": 22.1,
+     "employed_moe90": 10.9
+    },
+    {
+     "months_after": 6,
+     "n": 66,
+     "employed": 63.8,
+     "looking": 13.0,
+     "not_looking": 23.3,
+     "employed_moe90": 12.2
+    }
+   ]
+  },
+  "all": {
+   "label": "Everyone whose benefits ended without a job",
+   "spells": 189,
+   "rows": [
+    {
+     "months_after": 1,
+     "n": 189,
+     "employed": 37.5,
+     "looking": 36.5,
+     "not_looking": 26.0,
+     "employed_moe90": 7.1
+    },
+    {
+     "months_after": 3,
+     "n": 158,
+     "employed": 49.5,
+     "looking": 25.1,
+     "not_looking": 25.4,
+     "employed_moe90": 8.1
+    },
+    {
+     "months_after": 6,
+     "n": 125,
+     "employed": 60.8,
+     "looking": 17.9,
+     "not_looking": 21.3,
+     "employed_moe90": 8.9
+    }
+   ]
+  }
+ }
+}

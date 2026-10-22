@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.DS_Store
+data/raw/
+data/sipp/
+site/dist/
+# Built in CI from the fetched sources; sipp.json is computed locally and committed
+site/data/*.json
+!site/data/sipp.json

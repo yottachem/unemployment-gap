@@ -1,0 +1,34 @@
+# Source registry. The ingest job fetches every source on each run; the site build
+# reads the raw files and records each series' latest observation on the status table.
+fred:
+  url: https://fred.stlouisfed.org/graph/fredgraph.csv?id={id}
+  publisher: BLS via FRED (Federal Reserve Bank of St. Louis)
+  license: Public domain (US Gov); FRED attribution requested
+  series:
+    UNRATE:      {label: "Unemployment rate (U-3)", unit: pct, source: "BLS Current Population Survey"}
+    U6RATE:      {label: "U-6 (adds underemployed and marginally attached)", unit: pct, source: "BLS Current Population Survey"}
+    LNS13025703: {label: "Share of unemployed out 27+ weeks", unit: pct, source: "BLS Current Population Survey"}
+    UEMP27OV:    {label: "Unemployed 27+ weeks", unit: thousands, source: "BLS Current Population Survey"}
+    UEMPMED:     {label: "Median weeks unemployed", unit: weeks, source: "BLS Current Population Survey"}
+    LNS12300060: {label: "Employment rate, ages 25-54", unit: pct, source: "BLS Current Population Survey"}
+    JTSHIR:      {label: "Hiring rate", unit: pct, source: "BLS JOLTS"}
+    JTSLDR:      {label: "Layoff and discharge rate", unit: pct, source: "BLS JOLTS"}
+    USREC:       {label: "NBER recession indicator", unit: flag, source: "NBER via FRED"}
+
+dol_5159:
+  url: https://oui.doleta.gov/unemploy/csv/ar5159.csv
+  name: "ETA 5159 Claims and Payment Activities (state UI)"
+  publisher: U.S. Department of Labor, Employment and Training Administration
+  license: Public domain (US Gov)
+  data_map: https://oui.doleta.gov/dmstree/handbooks/402/402_4/4024c6/4024c6.pdf#ETA5159
+  columns:
+    c51: first_payments   # First payments, state UI, total (line 303, col 21)
+    c56: final_payments   # Final payments, state UI, total (line 303, col 26)
+
+sipp:
+  url: https://www2.census.gov/programs-surveys/sipp/data/datasets/{year}/pu{year}_csv.zip
+  name: Survey of Income and Program Participation, public-use files
+  publisher: U.S. Census Bureau
+  license: Public domain (US Gov)
+  years: [2023, 2024, 2025]   # interview years; each covers the prior calendar year
+  note: Processed locally by analysis/sipp.py (about 3 GB per year); output committed to site/data/sipp.json
