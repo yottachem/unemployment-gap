@@ -20,7 +20,7 @@
   const state = { range: "2000", st: "US" };
   const charts = [];                 // {section, render()}
   const groups = new Map();          // crosshair sync: group -> Set of chart handles
-  let LABOR, BENEFITS, SIPP;
+  let LABOR, BENEFITS, SIPP, SECT;
 
   // ---------- helpers ----------
   const el = (tag, attrs = {}, text) => {
@@ -413,9 +413,139 @@
 
   function writeMeta() {
     const rows = LABOR.freshness.map((f) => [f.label, f.source, fmtMonth(parseMonth(f.first)), fmtMonth(parseMonth(f.latest))]);
-    rows.push(["What happens after benefits end (Section 4)", "Census SIPP", SIPP.reference_years.split("-")[0], SIPP.reference_years.split("-")[1]]);
+    rows.push(["What happens after benefits end (Section 5)", "Census SIPP", SIPP.reference_years.split("-")[0], SIPP.reference_years.split("-")[1]]);
     table(document.getElementById("freshness"), ["Series", "Source", "From", "Latest"], rows);
     document.getElementById("built").textContent = `Data checked ${new Date(LABOR.built).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}. Each source updates on its own schedule; see the table above for the latest month of each.`;
+  }
+
+  // ---------- section 3: sectors ----------
+  const METRICS = [["unemp", "Unemployment rate"], ["hires", "Hiring rate"], ["layoffs", "Layoff rate"]];
+  const S_COL = { unemp_avg12: 4, hires_avg12: 5, layoffs_avg12: 6 };
+
+  function buildSectors() {
+    const host = document.getElementById("sector-dumbbell");
+    const metricCtl = document.getElementById("sector-metric");
+    const tip = el("div", { class: "tip", hidden: "" });
+    host.append(tip);
+    const all = SECT.sectors.find((s) => s.key === "all");
+    const change = (s, m) => s.summary[m].now - s.summary[m].base;
+    const rows = SECT.sectors.filter((s) => s.key !== "all").sort((a, b) => change(b, "unemp") - change(a, "unemp"));
+    rows.push(all);
+    const sel = { key: rows[0].key, metric: "unemp" };
+    const signed = (v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt1(Math.abs(v))} pts`;
+
+    function renderDumbbell() {
+      host.querySelectorAll("svg").forEach((s) => s.remove());
+      const width = Math.max(280, host.clientWidth);
+      const wide = width >= 760;
+      metricCtl.hidden = wide;
+      metricCtl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === sel.metric)));
+      const metrics = wide ? METRICS : METRICS.filter(([m]) => m === sel.metric);
+      const labelW = wide ? 236 : 0;
+      const rowH = wide ? 30 : 44, head = 34, gap = 28, sepGap = 10;
+      const height = head + rows.length * rowH + sepGap + 8;
+      const colW = (width - labelW - gap * (metrics.length - 1)) / metrics.length;
+      const svg = d3.select(host).insert("svg", ".tip").attr("viewBox", `0 0 ${width} ${height}`).attr("height", height)
+        .attr("role", "group").attr("aria-label", "Sectors: 2019 average vs. last 12 months. Select a sector to see its trend.");
+      const rowY = (i) => head + i * rowH + (i === rows.length - 1 ? sepGap : 0);
+
+      const scales = metrics.map(([m], j) => {
+        const x0 = labelW + j * (colW + gap);
+        // Dot plot: fit the data range (no zero baseline needed) so changes are visible
+        const lo = d3.min(rows, (s) => Math.min(s.summary[m].base, s.summary[m].now));
+        const hi = d3.max(rows, (s) => Math.max(s.summary[m].base, s.summary[m].now));
+        const x = d3.scaleLinear().domain([Math.max(0, lo - 0.25), hi + 0.25]).range([x0 + 34, x0 + colW - 40]);
+        svg.append("text").attr("class", "db-col-title").attr("x", x0 + 4).attr("y", 13).text(METRICS.find((d) => d[0] === m)[1]);
+        const g = svg.append("g");
+        for (const t of x.ticks(4)) {
+          g.append("line").attr("class", "gridline").attr("x1", Math.round(x(t)) + 0.5).attr("x2", Math.round(x(t)) + 0.5).attr("y1", head - 4).attr("y2", height - 4);
+          g.append("text").attr("class", "axis").attr("x", x(t)).attr("y", 28).attr("text-anchor", "middle").append("tspan").style("fill", "var(--muted)").style("font-size", "11px").text(`${t}%`);
+        }
+        return { m, x };
+      });
+      svg.append("line").attr("class", "gridline").attr("x1", 0).attr("x2", width).attr("y1", rowY(rows.length - 1) - sepGap / 2).attr("y2", rowY(rows.length - 1) - sepGap / 2);
+
+      rows.forEach((s, i) => {
+        const y0 = rowY(i), cy = wide ? y0 + rowH / 2 : y0 + 30;
+        const g = svg.append("g").attr("class", `db-row${s.key === "all" ? " total" : ""}${s.key === sel.key ? " selected" : ""}`)
+          .attr("tabindex", 0).attr("role", "button").attr("aria-pressed", String(s.key === sel.key))
+          .attr("aria-label", `${s.label}. ${METRICS.map(([m, l]) => `${l} ${fmt1(s.summary[m].base)}% in 2019, ${fmt1(s.summary[m].now)}% now`).join("; ")}`);
+        g.append("rect").attr("class", "band").attr("x", 0).attr("y", y0).attr("width", width).attr("height", rowH).attr("rx", 6);
+        g.append("text").attr("class", "db-label").attr("x", wide ? 8 : 4).attr("y", wide ? cy + 4 : y0 + 14).text(s.label);
+        for (const { m, x } of scales) {
+          const { base, now } = s.summary[m];
+          g.append("line").attr("class", "db-link").attr("x1", x(base)).attr("x2", x(now)).attr("y1", cy).attr("y2", cy);
+          g.append("circle").attr("class", "db-base").attr("r", 4).attr("cx", x(base)).attr("cy", cy);
+          g.append("circle").attr("class", "db-now").attr("r", 5).attr("cx", x(now)).attr("cy", cy);
+          const right = now >= base;
+          g.append("text").attr("class", "db-val").attr("x", x(now) + (right ? 9 : -9)).attr("y", cy + 4)
+            .attr("text-anchor", right ? "start" : "end").text(`${fmt1(now)}%`);
+        }
+        const showTip = (ev) => {
+          tip.replaceChildren(el("div", { class: "when" }, s.label));
+          for (const [m, l] of METRICS) {
+            const r = el("div", { class: "row" });
+            r.append(el("b", {}, `${fmt1(s.summary[m].base)}% → ${fmt1(s.summary[m].now)}%`), el("span", { class: "n" }, `${l} (${signed(change(s, m))})`));
+            tip.append(r);
+          }
+          tip.append(el("div", { class: "note" }, "2019 average → last 12 months. Click for trend."));
+          tip.hidden = false;
+          const tx = ev && ev.offsetX != null ? ev.offsetX : width / 2;
+          tip.style.left = `${Math.max(0, Math.min(tx + 12, width - tip.offsetWidth))}px`;
+          tip.style.top = `${y0 + rowH + 4}px`;
+        };
+        const choose = () => { sel.key = s.key; renderDumbbell(); renderDetailTitle(); for (const c of charts.filter((c) => c.section === "sector")) c.render(); };
+        g.on("pointermove", showTip).on("pointerleave", () => (tip.hidden = true)).on("focus", () => showTip(null)).on("blur", () => (tip.hidden = true))
+          .on("click", choose).on("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); choose(); } });
+      });
+    }
+    metricCtl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { sel.metric = b.dataset.m; renderDumbbell(); }));
+    new ResizeObserver(() => renderDumbbell()).observe(host);
+
+    const u = all.summary.unemp, h = all.summary.hires;
+    document.getElementById("sector-period").textContent =
+      `Last 12 months: through ${fmtMonth(parseMonth(u.through))} for unemployment, ${fmtMonth(parseMonth(h.through))} for hiring and layoffs. Sorted by change in unemployment rate since 2019. Select a sector to see its trend below.`;
+
+    // Detail charts for the selected sector
+    const spts = (key, col) => SECT.sectors.find((s) => s.key === key).data.map((r) => [parseMonth(r[0]), r[S_COL[col]]]);
+    const label = () => SECT.sectors.find((s) => s.key === sel.key).label;
+    const renderDetailTitle = () => { document.getElementById("sector-detail-title").textContent = `Trend: ${label()}`; };
+    renderDetailTitle();
+    const domain = () => {
+      const latest = d3.max(SECT.sectors.find((s) => s.key === sel.key).data.filter((r) => r[S_COL.unemp_avg12] != null), (r) => parseMonth(r[0]));
+      const first = parseMonth("2001-01"), start = rangeStart(latest);
+      return [start && start > first ? start : first, latest];
+    };
+    const grid = document.getElementById("sector-charts");
+    const c1 = card(grid, "Unemployment rate", "12-month average");
+    lineChart(c1, { title: "Sector unemployment rate", unit: "pct", group: "sector", data: () => ({
+      domain: domain(), shades: recessionShades(),
+      series: [{ label: label(), short: "Sector", color: "--s1", points: spts(sel.key, "unemp_avg12") },
+               ...(sel.key === "all" ? [] : [{ label: "All industries", short: "All", color: "--muted", points: spts("all", "unemp_avg12") }])],
+    }) });
+    charts[charts.length - 1].section = "sector";
+    const c2 = card(grid, "Hiring and layoffs", "12-month average, percent of employment");
+    lineChart(c2, { title: "Sector hiring and layoff rates", unit: "pct", group: "sector", data: () => ({
+      domain: domain(), shades: recessionShades(),
+      series: [{ label: "Hiring rate", short: "Hires", color: "--s1", points: spts(sel.key, "hires_avg12") },
+               { label: "Layoff rate", short: "Layoffs", color: "--s2", points: spts(sel.key, "layoffs_avg12") }],
+    }) });
+    charts[charts.length - 1].section = "sector";
+
+    // Lede and table
+    const up = rows.filter((s) => s.key !== "all" && change(s, "unemp") > 0.1);
+    const hireDown = rows.filter((s) => s.key !== "all" && change(s, "hires") < -0.1);
+    const layNotUp = rows.filter((s) => s.key !== "all" && change(s, "layoffs") <= 0.1);
+    const n = rows.length - 1;
+    const p = document.getElementById("lede-sector"); p.replaceChildren();
+    const top = up.slice(0, 3).map((s) => `${s.label.toLowerCase()} (${fmt1(s.summary.unemp.base)}% to ${fmt1(s.summary.unemp.now)}%)`);
+    p.append(`Compared with 2019, unemployment is higher in `, el("b", {}, `${up.length} of ${n}`), ` sectors and hiring is lower in `, el("b", {}, `${hireDown.length} of ${n}`),
+      `, while layoffs are at or below 2019 in ${layNotUp.length} of ${n}. `);
+    if (top.length) p.append(`The largest increases in unemployment: ${top.slice(0, -1).join(", ")}${top.length > 1 ? ", and " : ""}${top[top.length - 1]}.`);
+
+    table(document.getElementById("sector-table"),
+      ["Sector", ...METRICS.flatMap(([, l]) => [`${l} 2019 %`, "Last 12 mo %", "Change (pts)"])],
+      rows.map((s) => [s.label, ...METRICS.flatMap(([m]) => [fmt1(s.summary[m].base), fmt1(s.summary[m].now), (change(s, m) > 0 ? "+" : "") + fmt1(change(s, m))])]));
   }
 
   function setRange(r) {
@@ -426,13 +556,13 @@
     try { localStorage.setItem("ug-range", r); } catch (e) { /* storage unavailable */ }
   }
 
-  Promise.all(["data/labor.json", "data/benefits.json", "data/sipp.json"].map((u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u); return r.json(); })))
-    .then(([labor, benefits, sipp]) => {
-      LABOR = labor; BENEFITS = benefits; SIPP = sipp;
+  Promise.all(["data/labor.json", "data/benefits.json", "data/sipp.json", "data/sectors.json"].map((u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u); return r.json(); })))
+    .then(([labor, benefits, sipp, sectors]) => {
+      LABOR = labor; BENEFITS = benefits; SIPP = sipp; SECT = sectors;
       let saved = null; try { saved = localStorage.getItem("ug-range"); } catch (e) { /* storage unavailable */ }
       if (saved && ["2000", "2015", "3y", "all"].includes(saved)) state.range = saved;
       document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => setRange(b.dataset.range)));
-      buildSection1(); buildSection2(); buildSection3(); buildSection4();
+      buildSection1(); buildSection2(); buildSectors(); buildSection3(); buildSection4();
       writeTiles(); writeLedes(); writeMeta();
       setRange(state.range);
     })

@@ -10,6 +10,8 @@ The unemployment rate can be low while people looking for work struggle to find 
 |--------|------------------|--------|---------|
 | BLS Current Population Survey via FRED | Unemployment rate (U-3, U-6), duration of unemployment, employment rate ages 25-54 | 1948 (U-6 1994, median duration 1967) | Monthly |
 | BLS JOLTS via FRED | Hiring rate, layoff and discharge rate | Dec 2000 | Monthly |
+| BLS CPS via FRED | Unemployment rate by industry of last job (10 sectors, not seasonally adjusted) | 2000 | Monthly |
+| BLS JOLTS via BLS API (keyless v1) | Hiring and layoff rates by industry | 2001 | Monthly; falls back to the published copy if the API is rate limited |
 | DOL ETA 5159 | State UI first payments, final payments (benefits used up), exhaustion rate | 1971 | Monthly |
 | Census SIPP public-use files | Status 1, 3, 6 months after benefits end | 2022-2024 pooled | Yearly, computed locally |
 | NBER via FRED | Recession dates | 1854 | As announced |
@@ -20,13 +22,13 @@ Exhaustion rates use DOL's formula and match DOL's published quarterly rates (ch
 
 ```sh
 uv sync
-uv run python -m ingest.fetch            # FRED series and DOL ETA 5159 into data/raw/
-uv run python -m transform.build_data    # site/data/labor.json, benefits.json
+uv run python -m ingest.fetch            # FRED series, DOL ETA 5159, BLS JOLTS by industry into data/raw/
+uv run python -m transform.build_data    # site/data/labor.json, benefits.json, sectors.json
 uv run python site/build.py              # site/dist (static files, JSON, CSV downloads)
 uv run pytest
 ```
 
-Section 4 (SIPP) downloads about 3 GB per year and runs locally, not in CI:
+Section 5 (SIPP) downloads about 3 GB per year and runs locally, not in CI:
 
 ```sh
 uv run python -m analysis.sipp           # writes site/data/sipp.json (committed)
@@ -40,7 +42,7 @@ When Census publishes a new SIPP year (usually summer), add it to `sources.yaml`
 |------|---------|
 | `sources.yaml` | Source registry: URLs, series, column mappings, licenses |
 | `ingest/fetch.py` | Downloads every scheduled source with retry on transient errors |
-| `transform/build_data.py` | Exhaustion rate, 12-month averages, recessions, freshness |
+| `transform/build_data.py` | Exhaustion rate, sector rates (2019 vs. last 12 months), 12-month averages, recessions, freshness |
 | `analysis/sipp.py` | Links SIPP people across years, finds benefit spells that end without a job, follows them forward |
 | `site/static/` | Page, styles, D3 charts |
 | `.github/workflows/update.yml` | Weekday fetch, test, build, deploy to GitHub Pages |

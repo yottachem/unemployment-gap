@@ -47,8 +47,32 @@
     <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="s2-table"></div></details>
   </section>
 
+  <section class="block" id="s-sector">
+    <h2>3. By sector</h2>
+    <p class="lede" id="lede-sector"></p>
+    <div class="card">
+      <div class="dumbbell-head">
+        <ul class="legend" aria-label="Legend">
+          <li><span class="key-dot hollow"></span>2019 average</li>
+          <li><span class="key-dot"></span>Last 12 months</li>
+        </ul>
+        <div class="seg" role="group" aria-label="Measure" id="sector-metric" hidden>
+          <button type="button" data-m="unemp">Unemployment</button>
+          <button type="button" data-m="hires">Hiring</button>
+          <button type="button" data-m="layoffs">Layoffs</button>
+        </div>
+      </div>
+      <div id="sector-dumbbell" class="chart"></div>
+      <p class="note" id="sector-period"></p>
+    </div>
+    <h3 class="detail-title" id="sector-detail-title"></h3>
+    <div class="grid2" id="sector-charts"></div>
+    <p class="note">Unemployment by industry of the person's last job (CPS, not seasonally adjusted, so shown as 12-month averages; people with no previous job are not assigned an industry). Hiring and layoffs from JOLTS, seasonally adjusted, 12-month averages. "Trade, transportation, utilities" combines two CPS categories weighted by labor force. Mining and agriculture are omitted: small CPS samples, and agriculture is not in JOLTS. BLS did not collect October 2025 household survey data, so averages that span it use 11 months.</p>
+    <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="sector-table"></div></details>
+  </section>
+
   <section class="block" id="s3">
-    <h2>3. When state unemployment benefits run out</h2>
+    <h2>4. When state unemployment benefits run out</h2>
     <p class="lede" id="lede3"></p>
     <div class="state-pick">
       <label for="state" class="ctl-label">State</label>
@@ -62,7 +86,7 @@
   </section>
 
   <section class="block" id="s4">
-    <h2>4. What happens after benefits end</h2>
+    <h2>5. What happens after benefits end</h2>
     <p class="lede" id="lede4"></p>
     <div class="card" id="s4-chart"></div>
     <p class="note" id="s4-note"></p>
@@ -87,14 +111,15 @@
       <li><b>U-6</b>: U-3 plus people who want work but stopped looking ("marginally attached," including "discouraged workers") and people working part-time because they could not find full-time work, as a share of the labor force plus the marginally attached.</li>
       <li><b>Recessions</b> (gray shading): NBER business-cycle dates.</li>
     </ul>
-    <h3>Section 4 method</h3>
+    <h3>Section 5 method</h3>
     <p id="sipp-method"></p>
     <p>The Census Survey of Income and Program Participation (SIPP) re-interviews the same people every year, asking about each month of the prior year. That lets us follow someone from the month their benefits stopped to what they were doing afterward. SIPP does not record why benefits stopped. "5 or more months of benefits" is used as a stand-in for running out, since most states pay at most 26 weeks. Results are recomputed when Census releases a new year of SIPP data (usually in summer, covering the year before last).</p>
     <h3>Downloads</h3>
     <ul>
       <li><a href="data/labor.csv">labor.csv</a>: national monthly series (wide format)</li>
       <li><a href="data/benefits.csv">benefits.csv</a>: first payments, final payments, and exhaustion rate by state and month, 1971 to present</li>
-      <li><a href="data/sipp.json">sipp.json</a>: Section 4 estimates with sample sizes</li>
+      <li><a href="data/sectors.csv">sectors.csv</a>: unemployment, hiring, and layoff rates by sector and month, 2000 to present</li>
+      <li><a href="data/sipp.json">sipp.json</a>: Section 5 estimates with sample sizes</li>
     </ul>
     <p>Code and pipeline: <a href="https://github.com/yottachem/unemployment-gap">github.com/yottachem/unemployment-gap</a>. Data refreshes automatically each weekday.</p>
   </section>

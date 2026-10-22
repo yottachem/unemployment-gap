@@ -3,6 +3,7 @@ series, recessions, freshness) and site/data/benefits.json (state UI first and f
 payments, exhaustion rate).
 Usage: uv run python -m transform.build_data"""
 import json
+import shutil
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -82,6 +83,45 @@ def benefits_frame(raw: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return frames
 
 
+def combined_rate(rates: list[pd.Series], levels: list[pd.Series]) -> pd.Series:
+    """Unemployment rate for merged industries: total unemployed over total labor force, where
+    each industry's labor force is its unemployed level divided by its rate."""
+    lf = sum(lv / (r / 100) for r, lv in zip(rates, levels))
+    return 100 * sum(levels) / lf
+
+
+def sector_frames(src: dict) -> dict[str, pd.DataFrame]:
+    """Monthly unemployment, hires and layoff rates per sector, with 12-month averages."""
+    jolts = json.loads((RAW / "jolts_raw.json").read_text())
+    elements = src["bls_api"]["elements"]
+    out = {}
+    for s in src["sectors"]:
+        rates = [read_fred(i) for i in s["cps"]]
+        unemp = combined_rate(rates, [read_fred(i) for i in s["cps_levels"]]) if s.get("cps_levels") else rates[0]
+        f = pd.DataFrame({"unemp": unemp})
+        for e, name in elements.items():
+            pts = jolts[src["bls_api"]["jolts_id"].format(code=s["jolts"], element=e)]
+            f = f.join(pd.Series({pd.Timestamp(k + "-01"): v for k, v in pts.items()}, name=name), how="outer")
+        f = f.sort_index()
+        f.index = f.index.to_period("M")
+        f = f.reindex(pd.period_range(f.index.min(), f.index.max(), freq="M"))
+        for c in ["unemp", "hires", "layoffs"]:
+            # 11 of 12: BLS did not collect the October 2025 household survey (federal shutdown)
+            f[f"{c}_avg12"] = f[c].rolling(12, min_periods=11).mean()
+        out[s["key"]] = f
+    return out
+
+
+def sector_summary(f: pd.DataFrame) -> dict:
+    """2019 average vs. the latest 12 months, per metric."""
+    res = {}
+    for c in ["unemp", "hires", "layoffs"]:
+        latest = f[c].last_valid_index()  # last month actually published, not the padded index
+        res[c] = {"base": _num(f.loc[pd.Period("2019-01", "M"):pd.Period("2019-12", "M"), c].mean(), 2),
+                  "now": _num(f.loc[latest, f"{c}_avg12"], 2), "through": str(latest)}
+    return res
+
+
 def _num(v, nd=1):
     return None if pd.isna(v) else round(float(v), nd)
 
@@ -118,6 +158,50 @@ def main() -> None:
         "names": {"US": "United States (50 states + DC)", **{k: STATES.get(k, k) for k in frames if k != "US"}},
         "data": {k: [[str(m), *(_num(r[c], 1 if c == "exhaust_rate" else 0) for c in cols)]
                      for m, r in f.iterrows()] for k, f in frames.items()},
+    }, separators=(",", ":")))
+    sf = sector_frames(src)
+    cols = ["unemp", "hires", "layoffs", "unemp_avg12", "hires_avg12", "layoffs_avg12"]
+    (OUT / "sectors.json").write_text(json.dumps({
+        "built": now, "columns": ["month", *cols],
+        "sectors": [{"key": s["key"], "label": s["label"], "summary": sector_summary(sf[s["key"]]),
+                     "data": [[str(m), *(_num(r[c], 2) for c in cols)] for m, r in sf[s["key"]].iterrows()
+                              if m >= pd.Period("2000-01", "M")]} for s in src["sectors"]],
+    }, separators=(",", ":")))
+    shutil.copy(RAW / "jolts_raw.json", OUT / "jolts_raw.json")
+    for key, label, source, col in [("JOLTS-industry", "Hires and layoff rates by industry", "BLS JOLTS (BLS API)", "hires"),
+                                    ("CPS-industry", "Unemployment rate by industry of last job", "BLS Current Population Survey", "unemp")]:
+        c = sf["construction"][col].dropna()
+        freshness.append({"id": key, "label": label, "source": source,
+                          "first": max(str(c.index.min()), "2000-01"), "latest": str(c.index.max())})
+    (OUT / "labor.json").write_text(json.dumps({
+        "built": now, "series": series, "recessions": rec, "freshness": freshness,
+    }, separators=(",", ":")))
+
+    cols = ["first", "final", "first_avg12", "final_avg12", "exhaust_rate"]
+    (OUT / "benefits.json").write_text(json.dumps({
+        "built": now,
+        "columns": ["month", *cols],
+        "policy_periods": POLICY_PERIODS,
+        "names": {"US": "United States (50 states + DC)", **{k: STATES.get(k, k) for k in frames if k != "US"}},
+        "data": {k: [[str(m), *(_num(r[c], 1 if c == "exhaust_rate" else 0) for c in cols)]
+                     for m, r in f.iterrows()] for k, f in frames.items()},
+    }, separators=(",", ":")))
+    sf = sector_frames(src)
+    cols = ["unemp", "hires", "layoffs", "unemp_avg12", "hires_avg12", "layoffs_avg12"]
+    (OUT / "sectors.json").write_text(json.dumps({
+        "built": now, "columns": ["month", *cols],
+        "sectors": [{"key": s["key"], "label": s["label"], "summary": sector_summary(sf[s["key"]]),
+                     "data": [[str(m), *(_num(r[c], 2) for c in cols)] for m, r in sf[s["key"]].iterrows()
+                              if m >= pd.Period("2000-01", "M")]} for s in src["sectors"]],
+    }, separators=(",", ":")))
+    shutil.copy(RAW / "jolts_raw.json", OUT / "jolts_raw.json")
+    freshness.append({"id": "JOLTS-industry", "label": "Hires and layoff rates by industry", "source": "BLS JOLTS (BLS API)",
+                      "first": min(r[0] for r in [[k] for v in json.loads((RAW / "jolts_raw.json").read_text()).values() for k in v]),
+                      "latest": max(k for v in json.loads((RAW / "jolts_raw.json").read_text()).values() for k in v)})
+    freshness.append({"id": "CPS-industry", "label": "Unemployment rate by industry of last job", "source": "BLS Current Population Survey",
+                      "first": "2000-01", "latest": sf["construction"]["unemp"].last_valid_index().strftime("%Y-%m")})
+    (OUT / "labor.json").write_text(json.dumps({
+        "built": now, "series": series, "recessions": rec, "freshness": freshness,
     }, separators=(",", ":")))
     print(f"labor.json: {len(series)} series; benefits.json: {len(frames)} jurisdictions, through {freshness[-1]['latest']}")
 

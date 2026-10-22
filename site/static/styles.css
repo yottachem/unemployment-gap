@@ -130,3 +130,21 @@ thead th { position: sticky; top: 0; background: var(--surface); color: var(--in
 footer { border-top: 1px solid var(--grid); margin-top: 48px; padding-block: 20px 40px; font-size: 13px; color: var(--muted); }
 footer p { margin: 4px 0; }
 .empty { color: var(--muted); font-size: 14px; padding: 24px 0; }
+
+.dumbbell-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.dumbbell-head .legend { margin: 0; }
+.key-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--s1); }
+.key-dot.hollow { background: var(--surface); border: 2px solid var(--muted); width: 10px; height: 10px; }
+.db-col-title { font-size: 13px; font-weight: 600; fill: var(--ink); }
+.db-label { font-size: 13px; fill: var(--ink-2); }
+.db-row.total .db-label { fill: var(--ink); font-weight: 600; }
+.db-row { cursor: pointer; outline: none; }
+.db-row .band { fill: transparent; }
+.db-row:hover .band, .db-row:focus-visible .band { fill: var(--shade); }
+.db-row.selected .band { fill: var(--shade-2); }
+.db-row.selected .db-label { fill: var(--ink); font-weight: 600; }
+.db-link { stroke: var(--axis); stroke-width: 2; }
+.db-base { fill: var(--surface); stroke: var(--muted); stroke-width: 2; }
+.db-now { fill: var(--s1); stroke: var(--surface); stroke-width: 2; }
+.db-val { font-size: 12px; fill: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.detail-title { font-size: 17px; margin: 20px 0 8px; }

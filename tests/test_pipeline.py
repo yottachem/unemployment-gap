@@ -37,3 +37,10 @@ def test_matches_dol_published_exhaustion_rates():
     frames = benefits_frame(pd.read_csv(RAW / "ar5159.csv"))
     for st, published in {"MA": 38.38, "CA": 50.26, "NC": 53.42, "VT": 16.12, "TX": 43.88}.items():
         assert frames[st].loc[pd.Period("2026-06", "M"), "exhaust_rate"] == pytest.approx(published, abs=0.15)  # allows small late revisions
+
+
+def test_combined_rate_weights_by_labor_force():
+    from transform.build_data import combined_rate
+    # A: 10 unemployed at 5% (labor force 200); B: 30 unemployed at 10% (labor force 300) -> 40 / 500 = 8%
+    r = combined_rate([pd.Series([5.0]), pd.Series([10.0])], [pd.Series([10.0]), pd.Series([30.0])])
+    assert r.iloc[0] == pytest.approx(8.0)

@@ -15,7 +15,7 @@ def main() -> None:
         shutil.rmtree(DIST)
     shutil.copytree(HERE / "static", DIST)
     (DIST / "data").mkdir()
-    for f in ["labor.json", "benefits.json", "sipp.json"]:
+    for f in ["labor.json", "benefits.json", "sipp.json", "sectors.json", "jolts_raw.json"]:
         shutil.copy(HERE / "data" / f, DIST / "data" / f)
 
     labor = json.loads((HERE / "data" / "labor.json").read_text())
@@ -26,6 +26,9 @@ def main() -> None:
     b = json.loads((HERE / "data" / "benefits.json").read_text())
     rows = [[st, *r] for st, data in b["data"].items() for r in data]
     pd.DataFrame(rows, columns=["state", *b["columns"]]).to_csv(DIST / "data" / "benefits.csv", index=False)
+    sec = json.loads((HERE / "data" / "sectors.json").read_text())
+    rows = [[s["label"], *r] for s in sec["sectors"] for r in s["data"]]
+    pd.DataFrame(rows, columns=["sector", *sec["columns"]]).to_csv(DIST / "data" / "sectors.csv", index=False)
     (DIST / ".nojekyll").touch()
     print(f"site/dist: {sum(1 for _ in DIST.rglob('*') if _.is_file())} files")
 

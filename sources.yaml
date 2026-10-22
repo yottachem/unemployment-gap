@@ -1,5 +1,6 @@
 # Source registry. The ingest job fetches every source on each run; the site build
 # reads the raw files and records each series' latest observation on the status table.
+site_url: https://yottachem.github.io/unemployment-gap/
 fred:
   url: https://fred.stlouisfed.org/graph/fredgraph.csv?id={id}
   publisher: BLS via FRED (Federal Reserve Bank of St. Louis)
@@ -32,3 +33,24 @@ sipp:
   license: Public domain (US Gov)
   years: [2023, 2024, 2025]   # interview years; each covers the prior calendar year
   note: Processed locally by analysis/sipp.py (about 3 GB per year); output committed to site/data/sipp.json
+
+# Sector breakout. CPS unemployment rates by industry of last job are not seasonally adjusted,
+# so the site compares 12-month averages. JOLTS rates come from the BLS API (keyless v1:
+# 25 series and 10 years per request, 25 requests per day).
+bls_api:
+  url: https://api.bls.gov/publicAPI/v1/timeseries/data/
+  jolts_id: "JTS{code}000000000{element}R"   # industry code, all US, all size classes; HI hires, LD layoffs
+  elements: {HI: hires, LD: layoffs}
+  start_year: 2001
+sectors:
+  - {key: construction, label: Construction,                       cps: [LNU04032231], jolts: "230000"}
+  - {key: manufacturing, label: Manufacturing,                     cps: [LNU04032232], jolts: "300000"}
+  - {key: trade_transport, label: "Trade, transportation, utilities", cps: [LNU04032235, LNU04032236], cps_levels: [LNU03032235, LNU03032236], jolts: "400000"}
+  - {key: information, label: Information,                         cps: [LNU04032237], jolts: "510000"}
+  - {key: financial, label: Financial activities,                  cps: [LNU04032238], jolts: "510099"}
+  - {key: professional, label: Professional and business services, cps: [LNU04032239], jolts: "540099"}
+  - {key: edu_health, label: Education and health services,        cps: [LNU04032240], jolts: "600000"}
+  - {key: leisure, label: Leisure and hospitality,                 cps: [LNU04032241], jolts: "700000"}
+  - {key: other_services, label: Other services,                   cps: [LNU04032242], jolts: "810000"}
+  - {key: government, label: Government,                           cps: [LNU04028615], jolts: "900000"}
+  - {key: all, label: All industries,                              cps: [UNRATE], jolts: "000000"}
