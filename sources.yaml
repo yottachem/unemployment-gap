@@ -54,3 +54,19 @@ sectors:
   - {key: other_services, label: Other services,                   cps: [LNU04032242], jolts: "810000"}
   - {key: government, label: Government,                           cps: [LNU04028615], jolts: "900000"}
   - {key: all, label: All industries,                              cps: [UNRATE], jolts: "000000"}
+
+# Tech and biotech payroll employment (BLS Current Employment Statistics), indexed to the 2019
+# average. FRED carries some detailed industries; the rest come from the BLS API. Candidate ids
+# are tried in order and the first that returns data is used; an industry with no data yet is
+# listed as pending on the site. `replaces` hides a stand-in once the real series is confirmed.
+industries:
+  start_year: 2007
+  list:
+    - {key: csd, short: "IT services", group: tech, label: Computer systems design and IT services, sector: Professional and business services, ids: [CES6054150001], via: fred}
+    - {key: hosting, short: "Hosting and cloud", group: tech, label: "Data processing, hosting, cloud infrastructure", sector: Information, ids: [CES5051800001], via: fred}
+    - {key: software, short: "Software publishers", group: tech, label: Software publishers, sector: Information, ids: [CES5051320001, CEU5051320001, CES5051120001, CEU5051120001], via: bls}
+    - {key: semis, short: "Semiconductors", group: tech, label: Semiconductors and electronic components, sector: Manufacturing, ids: [CES3133440001], via: fred}
+    - {key: rnd, short: "Scientific R&D", group: biotech, label: Scientific research and development services, sector: Professional and business services, ids: [CES6054170001, CEU6054170001, CES6054171001, CEU6054171001], via: bls}
+    - {key: pharma, short: "Pharma manufacturing", group: biotech, label: Pharmaceutical and medicine manufacturing, sector: Manufacturing, ids: [CES3232540001, CEU3232540001], via: bls}
+    - {key: chem, short: "Chemical manufacturing", group: biotech, label: "Chemical manufacturing (includes pharma)", sector: Manufacturing, ids: [CES3232500001], via: fred, replaced_by: pharma}
+    - {key: instruments, short: "Instruments", group: biotech, label: "Measuring, electromedical, and control instruments", sector: Manufacturing, ids: [CES3133450001], via: fred}

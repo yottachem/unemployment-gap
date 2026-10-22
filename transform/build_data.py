@@ -122,6 +122,36 @@ def sector_summary(f: pd.DataFrame) -> dict:
     return res
 
 
+def industry_series(src: dict, ces: dict) -> list[dict]:
+    """Resolve each industry to its first candidate id with data; index to the 2019 average.
+    Unresolved industries are returned with status 'pending'; a stand-in is dropped once the
+    industry it stands in for resolves."""
+    out = []
+    for ind in src["industries"]["list"]:
+        sid, pts = None, None
+        for cand in ind["ids"]:
+            if ind["via"] == "fred" and (RAW / f"fred_{cand}.csv").exists():
+                s = read_fred(cand)
+            elif ces.get(cand):
+                s = pd.Series({pd.Timestamp(k + "-01"): v for k, v in ces[cand].items()}).sort_index()
+            else:
+                continue
+            s = s[s.index >= pd.Timestamp(f"{src['industries']['start_year']}-01-01")]
+            if len(s):
+                sid, pts = cand, s
+                break
+        row = {k: ind[k] for k in ("key", "short", "group", "label", "sector")}
+        if pts is None:
+            out.append({**row, "status": "pending", "candidates": ind["ids"]})
+            continue
+        base = pts[(pts.index >= "2019-01-01") & (pts.index <= "2019-12-01")].mean()
+        out.append({**row, "status": "confirmed", "series_id": sid, "seasonally_adjusted": sid.startswith("CES"),
+                    "replaced_by": ind.get("replaced_by"), "base_2019": _num(base, 1),
+                    "points": [[d.strftime("%Y-%m"), _num(v, 1), _num(100 * v / base, 1)] for d, v in pts.items()]})
+    confirmed = {i["key"] for i in out if i["status"] == "confirmed"}
+    return [i for i in out if not (i.get("replaced_by") in confirmed)]
+
+
 def _num(v, nd=1):
     return None if pd.isna(v) else round(float(v), nd)
 
@@ -168,6 +198,16 @@ def main() -> None:
                               if m >= pd.Period("2000-01", "M")]} for s in src["sectors"]],
     }, separators=(",", ":")))
     shutil.copy(RAW / "jolts_raw.json", OUT / "jolts_raw.json")
+    ces_path = RAW / "ces_raw.json"
+    ces = json.loads(ces_path.read_text()) if ces_path.exists() else {}
+    inds = industry_series(src, ces)
+    (OUT / "industries.json").write_text(json.dumps({"built": now, "base": "2019 average = 100", "industries": inds},
+                                                    separators=(",", ":")))
+    (OUT / "ces_raw.json").write_text(json.dumps(ces))
+    for i in inds:
+        freshness.append({"id": i.get("series_id", i["key"]), "label": f"Employment: {i['label']}", "source": "BLS Current Employment Statistics",
+                          "first": i["points"][0][0] if i["status"] == "confirmed" else None,
+                          "latest": i["points"][-1][0] if i["status"] == "confirmed" else None})
     for key, label, source, col in [("JOLTS-industry", "Hires and layoff rates by industry", "BLS JOLTS (BLS API)", "hires"),
                                     ("CPS-industry", "Unemployment rate by industry of last job", "BLS Current Population Survey", "unemp")]:
         c = sf["construction"][col].dropna()
@@ -195,6 +235,16 @@ def main() -> None:
                               if m >= pd.Period("2000-01", "M")]} for s in src["sectors"]],
     }, separators=(",", ":")))
     shutil.copy(RAW / "jolts_raw.json", OUT / "jolts_raw.json")
+    ces_path = RAW / "ces_raw.json"
+    ces = json.loads(ces_path.read_text()) if ces_path.exists() else {}
+    inds = industry_series(src, ces)
+    (OUT / "industries.json").write_text(json.dumps({"built": now, "base": "2019 average = 100", "industries": inds},
+                                                    separators=(",", ":")))
+    (OUT / "ces_raw.json").write_text(json.dumps(ces))
+    for i in inds:
+        freshness.append({"id": i.get("series_id", i["key"]), "label": f"Employment: {i['label']}", "source": "BLS Current Employment Statistics",
+                          "first": i["points"][0][0] if i["status"] == "confirmed" else None,
+                          "latest": i["points"][-1][0] if i["status"] == "confirmed" else None})
     freshness.append({"id": "JOLTS-industry", "label": "Hires and layoff rates by industry", "source": "BLS JOLTS (BLS API)",
                       "first": min(r[0] for r in [[k] for v in json.loads((RAW / "jolts_raw.json").read_text()).values() for k in v]),
                       "latest": max(k for v in json.loads((RAW / "jolts_raw.json").read_text()).values() for k in v)})

@@ -14,13 +14,14 @@
     pct: (v) => `${fmt1(v)}%`,
     weeks: (v) => `${fmt1(v)} wks`,
     count: (v) => comma(v),
+    index: (v) => fmt1(v),
   };
-  const AXIS_FMT = { pct: (v) => `${v}%`, weeks: (v) => `${v}`, count: d3.format("~s") };
+  const AXIS_FMT = { pct: (v) => `${v}%`, weeks: (v) => `${v}`, count: d3.format("~s"), index: (v) => `${v}` };
 
   const state = { range: "2000", st: "US" };
   const charts = [];                 // {section, render()}
   const groups = new Map();          // crosshair sync: group -> Set of chart handles
-  let LABOR, BENEFITS, SIPP, SECT;
+  let LABOR, BENEFITS, SIPP, SECT, IND;
 
   // ---------- helpers ----------
   const el = (tag, attrs = {}, text) => {
@@ -94,6 +95,10 @@
       }
       svg.append("g").selectAll("line").data(y.ticks(5)).join("line").attr("class", (d) => (d === y.domain()[0] && yZero ? "baseline" : "gridline"))
         .attr("x1", m.left).attr("x2", width - m.right).attr("y1", (d) => Math.round(y(d)) + 0.5).attr("y2", (d) => Math.round(y(d)) + 0.5);
+      if (opts.ref != null && opts.ref > y.domain()[0] && opts.ref < y.domain()[1]) {
+        svg.append("line").attr("class", "ref-line").attr("x1", m.left).attr("x2", width - m.right)
+          .attr("y1", Math.round(y(opts.ref)) + 0.5).attr("y2", Math.round(y(opts.ref)) + 0.5);
+      }
       svg.append("g").attr("class", "axis").attr("transform", `translate(${m.left - 6},0)`)
         .call(d3.axisLeft(y).ticks(5).tickSize(0).tickFormat(fmtAxis)).call((g) => g.select(".domain").remove());
       const years = (domain[1] - domain[0]) / 3.156e10;
@@ -412,7 +417,7 @@
   }
 
   function writeMeta() {
-    const rows = LABOR.freshness.map((f) => [f.label, f.source, fmtMonth(parseMonth(f.first)), fmtMonth(parseMonth(f.latest))]);
+    const rows = LABOR.freshness.map((f) => [f.label, f.source, f.first ? fmtMonth(parseMonth(f.first)) : "Pending confirmation", f.latest ? fmtMonth(parseMonth(f.latest)) : ""]);
     rows.push(["What happens after benefits end (Section 5)", "Census SIPP", SIPP.reference_years.split("-")[0], SIPP.reference_years.split("-")[1]]);
     table(document.getElementById("freshness"), ["Series", "Source", "From", "Latest"], rows);
     document.getElementById("built").textContent = `Data checked ${new Date(LABOR.built).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}. Each source updates on its own schedule; see the table above for the latest month of each.`;
@@ -548,6 +553,50 @@
       rows.map((s) => [s.label, ...METRICS.flatMap(([m]) => [fmt1(s.summary[m].base), fmt1(s.summary[m].now), (change(s, m) > 0 ? "+" : "") + fmt1(change(s, m))])]));
   }
 
+  // ---------- section 3 (cont.): tech and biotech payroll employment ----------
+  function buildIndustries() {
+    const all = IND.industries;
+    const ok = all.filter((i) => i.status === "confirmed"), pending = all.filter((i) => i.status === "pending");
+    // Color follows the industry, fixed by its slot in the group, so a series confirmed later does not repaint others
+    const SLOT = { csd: "--s1", hosting: "--s2", software: "--s3", semis: "--s4", rnd: "--s1", pharma: "--s2", chem: "--s2", instruments: "--s3" };
+    const pts = (i) => i.points.map((p) => [parseMonth(p[0]), p[2]]);
+    const domain = () => {
+      const first = d3.min(ok, (i) => parseMonth(i.points[0][0])), latest = d3.max(ok, (i) => parseMonth(i.points[i.points.length - 1][0]));
+      const start = rangeStart(latest);
+      return [start && start > first ? start : first, latest];
+    };
+    const grid = document.getElementById("ind-charts");
+    for (const [g, title] of [["tech", "Tech"], ["biotech", "Biotech and life science tools"]]) {
+      const c = card(grid, title, "Payroll employment, 2019 average = 100");
+      lineChart(c, { title: `${title} employment index`, unit: "index", yZero: false, ref: 100, group: "ind", data: () => ({
+        domain: domain(), shades: recessionShades(),
+        series: ok.filter((i) => i.group === g).map((i) => ({ label: i.label, short: i.short, color: SLOT[i.key] || "--s1", points: pts(i) })),
+      }) });
+    }
+    const latestIdx = (i) => i.points[i.points.length - 1][2];
+    const lc = (t) => (/^[A-Z]{2}/.test(t) ? t : t[0].toLowerCase() + t.slice(1)); // keep IT, R&D
+    const ranked = [...ok].sort((a, b) => latestIdx(b) - latestIdx(a));
+    const pctTxt = (v) => `${v >= 100 ? "+" : "\u2212"}${Math.abs(Math.round(v - 100))}%`;
+    const p = document.getElementById("lede-ind"); p.replaceChildren();
+    p.append(`Payroll employment through ${fmtMonth(parseMonth(ok[0].points[ok[0].points.length - 1][0]))} compared with 2019: `,
+      ...ranked.flatMap((i, k) => [k ? (k === ranked.length - 1 ? ", and " : ", ") : "", `${lc(i.short)} `, el("b", {}, pctTxt(latestIdx(i)))]),
+      ". Employment shows whether an industry is growing, not how easy it is to get hired there.");
+    // Where each industry sits among the broad sectors above, one line per group
+    const where = (g) => {
+      const bySector = d3.group(all.filter((i) => i.group === g && !(i.key === "chem" && all.some((j) => j.key === "pharma" && j.status === "confirmed"))), (i) => i.sector);
+      return Array.from(bySector, ([sec, xs]) => `${sec} (${xs.map((i) => lc(i.short)).join(", ")})`).join("; ");
+    };
+    const notes = [`Where these sit in the sectors above. Tech: ${where("tech")}. Biotech: ${where("biotech")}.`];
+    if (pending.length) notes.push(`Pending: ${pending.map((i) => lc(i.short)).join(", ")}. BLS series being confirmed; added automatically once data arrives.`);
+    if (ok.some((i) => i.key === "chem")) notes.push("Chemical manufacturing stands in for pharma until then.");
+    if (ok.some((i) => !i.seasonally_adjusted)) notes.push("Some series are not seasonally adjusted (see table).");
+    document.getElementById("ind-note").textContent = notes.join(" ");
+    table(document.getElementById("ind-table"), ["Industry", "Sector on this site", "2019 avg (thousands)", "Latest (thousands)", "Index", "Latest month", "BLS series", "Seasonally adjusted"],
+      all.map((i) => i.status === "confirmed"
+        ? [i.label, i.sector, fmt1(i.base_2019), fmt1(i.points[i.points.length - 1][1]), fmt1(latestIdx(i)), fmtMonth(parseMonth(i.points[i.points.length - 1][0])), i.series_id, i.seasonally_adjusted ? "Yes" : "No"]
+        : [i.label, i.sector, "", "", "", "Pending", i.candidates.join(", "), ""]));
+  }
+
   function setRange(r) {
     state.range = r;
     document.querySelectorAll("#range button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === r)));
@@ -556,13 +605,13 @@
     try { localStorage.setItem("ug-range", r); } catch (e) { /* storage unavailable */ }
   }
 
-  Promise.all(["data/labor.json", "data/benefits.json", "data/sipp.json", "data/sectors.json"].map((u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u); return r.json(); })))
-    .then(([labor, benefits, sipp, sectors]) => {
-      LABOR = labor; BENEFITS = benefits; SIPP = sipp; SECT = sectors;
+  Promise.all(["data/labor.json", "data/benefits.json", "data/sipp.json", "data/sectors.json", "data/industries.json"].map((u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u); return r.json(); })))
+    .then(([labor, benefits, sipp, sectors, industries]) => {
+      LABOR = labor; BENEFITS = benefits; SIPP = sipp; SECT = sectors; IND = industries;
       let saved = null; try { saved = localStorage.getItem("ug-range"); } catch (e) { /* storage unavailable */ }
       if (saved && ["2000", "2015", "3y", "all"].includes(saved)) state.range = saved;
       document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => setRange(b.dataset.range)));
-      buildSection1(); buildSection2(); buildSectors(); buildSection3(); buildSection4();
+      buildSection1(); buildSection2(); buildSectors(); buildIndustries(); buildSection3(); buildSection4();
       writeTiles(); writeLedes(); writeMeta();
       setRange(state.range);
     })

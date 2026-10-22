@@ -43,14 +43,23 @@ def jolts_ids(src: dict) -> dict[str, tuple[str, str]]:
 
 def fetch_jolts(src: dict) -> dict:
     """All sector hires and layoff rates from the BLS API, in 10-year windows."""
-    api, ids = src["bls_api"], list(jolts_ids(src))
+    out = fetch_bls(list(jolts_ids(src)), src["bls_api"]["start_year"])
+    missing = [i for i, v in out.items() if not v]
+    if missing:
+        raise RuntimeError(f"BLS API returned no data for {missing}")
+    return out
+
+
+def fetch_bls(ids: list[str], start_year: int) -> dict:
+    """Monthly values for BLS series ids via the keyless API. Ids with no data come back empty."""
+    api_url = load_sources()["bls_api"]["url"]
     out = {i: {} for i in ids}
     end = date.today().year
-    for y0 in range(api["start_year"], end + 1, 10):
+    for y0 in range(start_year, end + 1, 10):
         for k in range(0, len(ids), 25):
             body = {"seriesid": ids[k:k + 25], "startyear": str(y0), "endyear": str(min(y0 + 9, end))}
             for attempt in range(4):
-                r = requests.post(api["url"], json=body, headers={"User-Agent": USER_AGENT}, timeout=180)
+                r = requests.post(api_url, json=body, headers={"User-Agent": USER_AGENT}, timeout=180)
                 if r.ok and r.json().get("status") == "REQUEST_SUCCEEDED":
                     break
                 time.sleep(20 * (attempt + 1))
@@ -60,9 +69,6 @@ def fetch_jolts(src: dict) -> dict:
                 for d in s["data"]:
                     if d["period"].startswith("M") and d["period"] != "M13" and d["value"] not in ("-", ""):
                         out[s["seriesID"]][f"{d['year']}-{d['period'][1:]}"] = float(d["value"])
-    missing = [i for i, v in out.items() if not v]
-    if missing:
-        raise RuntimeError(f"BLS API returned no data for {missing}")
     return out
 
 
@@ -70,6 +76,7 @@ def main() -> None:
     src = load_sources()
     RAW.mkdir(parents=True, exist_ok=True)
     sector_cps = {sid for s in src["sectors"] for sid in s["cps"] + s.get("cps_levels", [])} - set(src["fred"]["series"])
+    sector_cps |= {i["ids"][0] for i in src["industries"]["list"] if i["via"] == "fred"}
     for sid in [*src["fred"]["series"], *sorted(sector_cps)]:
         body = http_get(src["fred"]["url"].format(id=sid))
         if not body.startswith(b"observation_date"):
@@ -91,6 +98,20 @@ def main() -> None:
         jolts = json.loads(http_get(src["site_url"] + "data/jolts_raw.json"))
     (RAW / "jolts_raw.json").write_text(json.dumps(jolts))
     print(f"bls jolts: {len(jolts)} series")
+
+    # Candidate detailed-industry series. Not fatal: an unconfirmed id just stays pending.
+    cands = [c for i in src["industries"]["list"] if i["via"] == "bls" for c in i["ids"]]
+    try:
+        ces = fetch_bls(cands, src["industries"]["start_year"])
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::BLS API failed for industry candidates ({e}); trying the published copy")
+        try:
+            ces = json.loads(http_get(src["site_url"] + "data/ces_raw.json"))
+        except Exception:  # noqa: BLE001
+            ces = {}
+    (RAW / "ces_raw.json").write_text(json.dumps(ces))
+    found = sorted(k for k, v in ces.items() if v)
+    print(f"bls ces candidates: {len(found)} of {len(cands)} returned data {found}")
 
 
 if __name__ == "__main__":

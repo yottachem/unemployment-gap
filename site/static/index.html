@@ -67,8 +67,12 @@
     </div>
     <h3 class="detail-title" id="sector-detail-title"></h3>
     <div class="grid2" id="sector-charts"></div>
+    <h3 class="detail-title">Tech and biotech employment</h3>
+    <p class="lede" id="lede-ind"></p>
+    <div class="grid2" id="ind-charts"></div>
+    <p class="note" id="ind-note"></p>
     <p class="note">Unemployment by industry of the person's last job (CPS, not seasonally adjusted, so shown as 12-month averages; people with no previous job are not assigned an industry). Hiring and layoffs from JOLTS, seasonally adjusted, 12-month averages. "Trade, transportation, utilities" combines two CPS categories weighted by labor force. Mining and agriculture are omitted: small CPS samples, and agriculture is not in JOLTS. BLS did not collect October 2025 household survey data, so averages that span it use 11 months.</p>
-    <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="sector-table"></div></details>
+    <details class="table-view"><summary>Show data table</summary><div class="tbl-wrap" id="sector-table"></div><div class="tbl-wrap" id="ind-table"></div></details>
   </section>
 
   <section class="block" id="s3">
@@ -119,6 +123,7 @@
       <li><a href="data/labor.csv">labor.csv</a>: national monthly series (wide format)</li>
       <li><a href="data/benefits.csv">benefits.csv</a>: first payments, final payments, and exhaustion rate by state and month, 1971 to present</li>
       <li><a href="data/sectors.csv">sectors.csv</a>: unemployment, hiring, and layoff rates by sector and month, 2000 to present</li>
+      <li><a href="data/industries.csv">industries.csv</a>: tech and biotech payroll employment (thousands) and index, 2007 to present</li>
       <li><a href="data/sipp.json">sipp.json</a>: Section 5 estimates with sample sizes</li>
     </ul>
     <p>Code and pipeline: <a href="https://github.com/yottachem/unemployment-gap">github.com/yottachem/unemployment-gap</a>. Data refreshes automatically each weekday.</p>

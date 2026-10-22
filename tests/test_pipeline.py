@@ -44,3 +44,17 @@ def test_combined_rate_weights_by_labor_force():
     # A: 10 unemployed at 5% (labor force 200); B: 30 unemployed at 10% (labor force 300) -> 40 / 500 = 8%
     r = combined_rate([pd.Series([5.0]), pd.Series([10.0])], [pd.Series([10.0]), pd.Series([30.0])])
     assert r.iloc[0] == pytest.approx(8.0)
+
+
+def test_industry_candidates_and_stand_in():
+    from transform.build_data import industry_series
+    src = {"industries": {"start_year": 2019, "list": [
+        {"key": "pharma", "short": "Pharma", "group": "biotech", "label": "Pharma", "sector": "Manufacturing", "ids": ["BAD", "GOOD"], "via": "bls"},
+        {"key": "chem", "short": "Chem", "group": "biotech", "label": "Chem", "sector": "Manufacturing", "ids": ["CHEM"], "via": "bls", "replaced_by": "pharma"},
+        {"key": "rnd", "short": "R&D", "group": "biotech", "label": "R&D", "sector": "PBS", "ids": ["NONE"], "via": "bls"},
+    ]}}
+    months = {f"2019-{m:02d}": 50.0 for m in range(1, 13)} | {"2020-01": 55.0}
+    out = {i["key"]: i for i in industry_series(src, {"BAD": {}, "GOOD": months, "CHEM": months})}
+    assert out["pharma"]["series_id"] == "GOOD" and out["pharma"]["points"][-1][2] == 110.0
+    assert "chem" not in out                     # stand-in dropped once pharma resolves
+    assert out["rnd"]["status"] == "pending"
