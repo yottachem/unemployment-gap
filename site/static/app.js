@@ -578,9 +578,20 @@
     const ranked = [...ok].sort((a, b) => latestIdx(b) - latestIdx(a));
     const pctTxt = (v) => `${v >= 100 ? "+" : "\u2212"}${Math.abs(Math.round(v - 100))}%`;
     const p = document.getElementById("lede-ind"); p.replaceChildren();
-    p.append(`Payroll employment through ${fmtMonth(parseMonth(ok[0].points[ok[0].points.length - 1][0]))} compared with 2019: `,
-      ...ranked.flatMap((i, k) => [k ? (k === ranked.length - 1 ? ", and " : ", ") : "", `${lc(i.short)} `, el("b", {}, pctTxt(latestIdx(i)))]),
-      ". Employment shows whether an industry is growing, not how easy it is to get hired there.");
+    const months = ok.map((i) => i.points[i.points.length - 1][0]).sort();
+    const asOf = months[0] === months[months.length - 1] ? fmtMonth(parseMonth(months[0]))
+      : `${d3.utcFormat("%b")(parseMonth(months[0]))} or ${fmtMonth(parseMonth(months[months.length - 1]))}`;
+    p.append(`Payroll employment through ${asOf} compared with 2019: `,
+      ...ranked.flatMap((i, k) => [k ? (k === ranked.length - 1 ? ", and " : ", ") : "", `${lc(i.short)} `, el("b", {}, pctTxt(latestIdx(i)))]), ". ");
+    // Off the post-2020 peak by 3% or more: growth since 2019 can hide recent cuts
+    const offPeak = ok.map((i) => {
+      const post = i.points.filter((q) => q[0] >= "2020-01");
+      const pk = post.reduce((a, b) => (b[1] > a[1] ? b : a));
+      return { i, pk, drop: 100 * (1 - i.points[i.points.length - 1][1] / pk[1]) };
+    }).filter((x) => x.drop >= 3).sort((a, b) => b.drop - a.drop);
+    if (offPeak.length) p.append(`Below their post-2020 peaks: `, ...offPeak.flatMap((x, k) => [k ? ", " : "",
+      `${lc(x.i.short)} `, el("b", {}, `\u2212${Math.round(x.drop)}%`), ` since ${fmtMonth(parseMonth(x.pk[0]))}`]), ". ");
+    p.append("Employment shows whether an industry is growing, not how easy it is to get hired there.");
     // Where each industry sits among the broad sectors above, one line per group
     const where = (g) => {
       const bySector = d3.group(all.filter((i) => i.group === g && !(i.key === "chem" && all.some((j) => j.key === "pharma" && j.status === "confirmed"))), (i) => i.sector);
